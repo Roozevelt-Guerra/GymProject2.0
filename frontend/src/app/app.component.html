@@ -1,0 +1,39 @@
+<div class="topbar">ESTRUTURA FORTE. RESULTADOS EXTRAORDINÁRIOS.</div>
+<header class="site-header">
+  <div class="container nav">
+    <a routerLink="/" class="wordmark" aria-label="MAQPRO início"
+      >MAQ<span>PRO</span><small>EQUIPAMENTOS PARA ACADEMIA</small></a
+    >
+    <nav aria-label="Menu principal">
+      <a
+        routerLink="/"
+        [routerLinkActiveOptions]="{ exact: true }"
+        routerLinkActive="active"
+        >Catálogo</a
+      ><a routerLink="/" fragment="sobre">A MAQPRO</a
+      ><a routerLink="/admin" routerLinkActive="active">Área administrativa</a>
+    </nav>
+    <a routerLink="/carrinho" class="cart-nav"
+      >Carrinho <span>{{ cart.count() }}</span></a
+    >
+  </div>
+</header>
+<main><router-outlet /></main>
+<footer>
+  <div class="container footer-grid">
+    <a routerLink="/" class="wordmark"
+      >MAQ<span>PRO</span><small>EQUIPAMENTOS PARA ACADEMIA</small></a
+    >
+    <p>Força em cada detalhe.<br />Equipamentos para o próximo nível.</p>
+    <a routerLink="/admin">Acesso administrativo ↗</a>
+  </div>
+  <div class="container footer-bottom">
+    © {{ year }} MAQPRO · Equipamentos para academia e estruturas metálicas.
+  </div>
+</footer>
+@if (cart.notice()) {
+  <div class="toast" role="status">
+    {{ cart.notice() }}
+    <button aria-label="Fechar aviso" (click)="cart.notice.set('')">×</button>
+  </div>
+}

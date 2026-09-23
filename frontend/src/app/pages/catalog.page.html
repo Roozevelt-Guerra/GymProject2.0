@@ -1,0 +1,113 @@
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <div class="eyebrow"><span></span> EQUIPAMENTOS DE ALTA PERFORMANCE</div>
+      <h1>Sua academia.<br />Mais forte.<br /><em>Mais MAQPRO.</em></h1>
+      <p>
+        Equipamentos que unem resistência, funcionalidade e presença. Encontre a
+        estrutura para transformar cada treino.
+      </p>
+      <a href="#catalogo" class="button"
+        >Explorar equipamentos <span>↗</span></a
+      >
+      <div class="hero-tags">
+        <span>◆ Estruturas metálicas</span><span>◆ Linha profissional</span>
+      </div>
+    </div>
+    <div class="hero-art">
+      <img
+        src="/assets/maqpro.png"
+        alt="MAQPRO — equipamentos para academia e estruturas metálicas"
+      />
+      <div class="art-caption">
+        <span>FEITO PARA IR ALÉM</span><strong>Força em cada detalhe.</strong>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="benefits">
+  <div class="container">
+    <span><b>01</b> Estrutura e resistência</span
+    ><span><b>02</b> Equipamentos profissionais</span
+    ><span><b>03</b> Orçamento personalizado</span>
+  </div>
+</div>
+<section id="catalogo" class="container section">
+  <div class="section-heading">
+    <div>
+      <div class="eyebrow red">NOSSO CATÁLOGO</div>
+      <h2>O próximo nível começa aqui<span>.</span></h2>
+    </div>
+    <p>Encontre o equipamento ideal<br />para o seu espaço.</p>
+  </div>
+  <div class="catalog-tools">
+    <div class="filter-tabs" aria-label="Categorias">
+      @for(c of categories();track c){<button
+        [class.selected]="category()===c"
+        (click)="category.set(c)"
+      >
+        {{c}}</button
+      >}
+    </div>
+    <label class="search"
+      ><span>⌕</span
+      ><input
+        aria-label="Buscar equipamento"
+        placeholder="Buscar equipamento..."
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+    /></label>
+  </div>
+  @if(loading()){
+  <div class="empty" role="status">Carregando equipamentos...</div>
+  }@else if(error()){
+  <div class="empty" role="alert">
+    <h3>Não foi possível carregar o catálogo</h3>
+    <p>{{error()}}</p>
+    <button class="button" (click)="load()">Tentar novamente</button>
+  </div>
+  }@else{
+  <div class="results-bar">
+    <span>{{filtered().length}} equipamentos encontrados</span
+    ><label
+      >Ordenar por
+      <select [ngModel]="sort()" (ngModelChange)="sort.set($event)">
+        <option value="default">Destaques</option>
+        <option value="low">Menor preço</option>
+        <option value="high">Maior preço</option>
+        <option value="name">Nome</option>
+      </select></label
+    >
+  </div>
+  <div class="product-grid">
+    @for(e of filtered();track e.id){<app-product-card
+      [equipment]="e"
+    />}@empty{
+    <div class="empty">
+      <h3>Nenhum equipamento encontrado</h3>
+      <p>
+        {{equipment().length?'Tente outra busca ou categoria.':'O catálogo está
+        sendo preparado. Volte em breve.'}}
+      </p>
+    </div>
+    }
+  </div>
+  }
+</section>
+<section id="sobre" class="container about">
+  <div>
+    <div class="eyebrow">A MAQPRO</div>
+    <h2>Uma estrutura forte<br />para grandes resultados.</h2>
+  </div>
+  <div>
+    <p>
+      Equipamentos para academia e estruturas metálicas com a identidade de quem
+      leva o treino a sério.
+    </p>
+    <p>
+      Monte seu carrinho com os equipamentos do seu projeto e converse com nossa
+      equipe pelo WhatsApp para receber um orçamento personalizado.
+    </p>
+    <a href="#catalogo" class="text-link">Monte seu orçamento ↗</a>
+  </div>
+</section>

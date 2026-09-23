@@ -1,0 +1,25 @@
+<section class="container section">
+  <form class="login-panel" #f="ngForm" (ngSubmit)="login()">
+    <div class="eyebrow red">ÁREA ADMINISTRATIVA</div>
+    <h1>Bem-vindo de volta<span>.</span></h1>
+    <p class="muted">Entre para gerenciar o catálogo MAQPRO.</p>
+    <label
+      >Usuário<input
+        name="username"
+        [(ngModel)]="username"
+        required
+        autocomplete="username" /></label
+    ><label
+      >Senha<input
+        name="password"
+        type="password"
+        [(ngModel)]="password"
+        required
+        autocomplete="current-password" /></label
+    >@if(error()){
+    <p class="feedback" role="alert">{{error()}}</p>
+    }<button class="button wide" [disabled]="f.invalid || busy()">
+      {{busy()?'Entrando...':'Entrar'}} →
+    </button>
+  </form>
+</section>

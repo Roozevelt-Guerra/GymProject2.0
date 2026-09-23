@@ -1,0 +1,73 @@
+<section class="container section">
+  <div class="eyebrow red">SEU PROJETO COMEÇA AQUI</div>
+  <h1>Meu carrinho<span>.</span></h1>
+  <p class="muted">
+    Revise seus equipamentos e solicite um orçamento personalizado.
+  </p>
+  @if(message()){
+  <p class="feedback" role="status">{{message()}}</p>
+  }@if(cart.items().length){
+  <div class="cart-grid">
+    <div>
+      @for(item of cart.items();track item.equipment.id){
+      <article class="cart-row">
+        <img [src]="item.equipment.imageUrl" [alt]="item.equipment.name" />
+        <div>
+          <a [routerLink]="['/equipamentos',item.equipment.id]"
+            ><h3>{{item.equipment.name}}</h3></a
+          >
+          <p>{{item.equipment.price | currency:'BRL'}} / unidade</p>
+          <button
+            class="remove"
+            (click)="cart.remove(item.equipment.id);whatsappUrl.set('')"
+          >
+            Remover
+          </button>
+        </div>
+        <label
+          >Qtd.<input
+            class="quantity"
+            type="number"
+            min="1"
+            max="99"
+            step="1"
+            [ngModel]="item.quantity"
+            (ngModelChange)="change(item.equipment.id,$event)" /></label
+        ><strong
+          >{{item.equipment.price*item.quantity | currency:'BRL'}}</strong
+        >
+      </article>
+      }
+    </div>
+    <aside class="summary">
+      <h2>Seu orçamento</h2>
+      <p>{{cart.count()}} unidades selecionadas</p>
+      <div class="summary-total">
+        <span>Total estimado</span
+        ><strong>{{cart.total() | currency:'BRL'}}</strong>
+      </div>
+      <p class="muted">
+        Frete e condições de pagamento serão combinados com nossa equipe.
+      </p>
+      <button class="button wide" [disabled]="busy()" (click)="quote()">
+        {{busy()?'Conferindo valores...':'Solicitar orçamento'}} ↗</button
+      >@if(whatsappUrl()){<a
+        class="button secondary wide"
+        [href]="whatsappUrl()"
+        target="_blank"
+        rel="noopener noreferrer"
+        >Abrir WhatsApp ↗</a
+      >}<small
+        >Uma mensagem com os itens, quantidades e valores será preparada para
+        você enviar.</small
+      >
+    </aside>
+  </div>
+  }@else{
+  <div class="empty">
+    <h2>Seu próximo projeto começa no catálogo.</h2>
+    <p>Adicione equipamentos para montar seu orçamento.</p>
+    <a routerLink="/" class="button">Explorar equipamentos →</a>
+  </div>
+  }
+</section>

@@ -1,0 +1,32 @@
+<article class="product-card">
+  <a [routerLink]="['/equipamentos', equipment().id]" class="product-photo"
+    ><img
+      [src]="equipment().imageUrl"
+      [alt]="equipment().name"
+      loading="lazy"
+      (error)="imageError($event)"
+    /><span class="category-label">{{ equipment().category }}</span></a
+  >
+  <div class="product-info">
+    <a [routerLink]="['/equipamentos', equipment().id]"
+      ><h3>{{ equipment().name }}</h3></a
+    >
+    <p>{{ equipment().description }}</p>
+    <div class="product-bottom">
+      <div>
+        <small>Valor do equipamento</small
+        ><strong>{{ equipment().price | currency: "BRL" }}</strong>
+      </div>
+      <button
+        class="icon-button add-button"
+        (click)="cart.add(equipment())"
+        [attr.aria-label]="'Adicionar ' + equipment().name + ' ao carrinho'"
+      >
+        +
+      </button>
+    </div>
+    <a class="text-link" [routerLink]="['/equipamentos', equipment().id]"
+      >Conhecer equipamento <span>↗</span></a
+    >
+  </div>
+</article>

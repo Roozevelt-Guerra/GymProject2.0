@@ -1,0 +1,126 @@
+<section class="container section">
+  <div class="section-heading">
+    <div>
+      <div class="eyebrow red">ÁREA ADMINISTRATIVA</div>
+      <h1>Gerenciar equipamentos<span>.</span></h1>
+    </div>
+    <button class="button secondary" (click)="logout()" [disabled]="busy()">
+      Sair
+    </button>
+  </div>
+  @if(message()){
+  <p class="feedback" role="status">{{message()}}</p>
+  }
+  <div class="admin-grid">
+    <form class="admin-form" #f="ngForm" (ngSubmit)="save()">
+      <h2>{{editingId?'Editar equipamento':'Novo equipamento'}}</h2>
+      <label
+        >Nome<input
+          name="name"
+          [(ngModel)]="form.name"
+          required
+          maxlength="120" /></label
+      ><label
+        >Categoria<input
+          name="category"
+          [(ngModel)]="form.category"
+          required
+          maxlength="60"
+          placeholder="Ex.: Musculação" /></label
+      ><label
+        >Descrição<textarea
+          name="description"
+          [(ngModel)]="form.description"
+          required
+          maxlength="4000"
+          rows="5"
+        ></textarea></label
+      ><label
+        >Preço (R$)<input
+          name="price"
+          type="number"
+          [(ngModel)]="form.price"
+          required
+          min="0.01"
+          max="9999999999.99"
+          step="0.01" /></label
+      ><label
+        >URL da imagem (HTTPS)<input
+          name="imageUrl"
+          type="url"
+          [(ngModel)]="form.imageUrl"
+          required
+          pattern="https://.+"
+          maxlength="2048"
+          placeholder="https://seu-site.com/equipamento.jpg"
+      /></label>
+      <p class="muted">Use o endereço público de uma foto do equipamento.</p>
+      <button class="button wide" [disabled]="f.invalid || busy()">
+        {{busy()?'Salvando...':editingId?'Salvar alterações':'Cadastrar
+        equipamento'}}</button
+      >@if(editingId){<button
+        type="button"
+        class="button secondary wide"
+        (click)="reset()"
+      >
+        Cancelar edição</button
+      >}
+    </form>
+    <div>
+      @if(loading()){
+      <p role="status">Carregando catálogo...</p>
+      }@else if(loadFailed()){<button class="button secondary" (click)="load()">
+        Tentar carregar novamente</button
+      >}@for(e of equipment();track e.id){
+      <article class="admin-item">
+        <img [src]="e.imageUrl" [alt]="e.name" />
+        <div>
+          <h3>{{e.name}}</h3>
+          <p>{{e.category}} · {{e.price | currency:'BRL'}}</p>
+          <div class="admin-actions">
+            <button class="text-link" [disabled]="busy()" (click)="edit(e)">
+              Editar</button
+            ><button
+              class="remove"
+              [disabled]="busy()"
+              (click)="pendingDelete.set(e)"
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+      </article>
+      }@empty{
+      <p class="muted">
+        Cadastre o primeiro equipamento para publicá-lo no catálogo.
+      </p>
+      }
+    </div>
+  </div>
+</section>
+@if(pendingDelete();as e){
+<div class="modal-backdrop">
+  <section
+    class="modal"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="delete-title"
+  >
+    <h2 id="delete-title">Excluir equipamento?</h2>
+    <p>
+      “{{e.name}}” será removido do catálogo. Esta ação não pode ser desfeita.
+    </p>
+    <div class="modal-actions">
+      <button
+        class="button secondary"
+        [disabled]="busy()"
+        (click)="pendingDelete.set(null)"
+      >
+        Cancelar</button
+      ><button class="button" [disabled]="busy()" (click)="remove(e)">
+        Confirmar exclusão
+      </button>
+    </div>
+  </section>
+</div>
+}
