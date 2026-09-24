@@ -15,14 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {"app.admin-password=test-password-123", "app.whatsapp=5585999999999"})
 @AutoConfigureMockMvc
-class CatalogIntegrationTest {
-  @org.junit.jupiter.api.io.TempDir static java.nio.file.Path directory;
-
-  @org.springframework.test.context.DynamicPropertySource
-  static void storage(org.springframework.test.context.DynamicPropertyRegistry registry) {
-    registry.add("app.catalog-file", () -> directory.resolve("equipment.json").toString());
-  }
-
+class CatalogIntegrationTest extends PostgresTestSupport {
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper mapper;
   String payload =

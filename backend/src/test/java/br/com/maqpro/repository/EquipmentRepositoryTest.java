@@ -2,87 +2,59 @@ package br.com.maqpro.repository;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import br.com.maqpro.entity.Equipment;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.UncheckedIOException;
+import br.com.maqpro.PostgresTestSupport;
+import br.com.maqpro.dto.EquipmentDto;
+import br.com.maqpro.service.EquipmentService;
 import java.math.BigDecimal;
-import java.nio.file.*;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
-class EquipmentRepositoryTest {
-  @TempDir Path directory;
+@SpringBootTest(properties = "app.admin-password=test-password-123")
+class EquipmentRepositoryTest extends PostgresTestSupport {
+  @Autowired EquipmentService service;
+  @Autowired JdbcTemplate jdbc;
 
-  EquipmentRepository open(Path file) {
-    return new EquipmentRepository(new ObjectMapper(), file.toString());
-  }
+  @BeforeEach
+  void clear() { jdbc.execute("TRUNCATE equipment, category RESTART IDENTITY CASCADE"); }
 
-  Equipment item(Long id, String name) {
-    return new Equipment(
-        id,
-        name,
-        "Descrição",
-        new BigDecimal("1250.50"),
-        "https://example.com/photo.jpg",
-        "Musculação");
-  }
-
-  @Test
-  void savesUpdatesAndDeletesSurviveReopeningWithoutReusingIds() {
-    Path file = directory.resolve("data/equipment.json");
-    var first = open(file);
-    assertTrue(first.findAll().isEmpty());
-    Equipment saved = first.save(item(null, "Leg press"));
-    var second = open(file);
-    assertEquals(saved, second.findById(saved.id()).orElseThrow());
-    second.save(item(saved.id(), "Leg press atualizado"));
-    var third = open(file);
-    assertEquals("Leg press atualizado", third.findById(saved.id()).orElseThrow().name());
-    third.delete(saved);
-    var fourth = open(file);
-    assertTrue(fourth.findAll().isEmpty());
-    assertTrue(fourth.save(item(null, "Novo equipamento")).id() > saved.id());
+  EquipmentDto item(String name, String category, Boolean active) {
+    return new EquipmentDto(null, name, "Descrição", new BigDecimal("1250.50"),
+        "https://example.com/photo.jpg", category, active);
   }
 
   @Test
-  void corruptFileIsNotReplaced() throws Exception {
-    Path file = directory.resolve("equipment.json");
-    Files.writeString(file, "{broken json");
-    assertThrows(IllegalStateException.class, () -> open(file));
-    assertEquals("{broken json", Files.readString(file));
-    Files.writeString(file, "{\"nextId\":1,\"equipment\":null}");
-    assertThrows(IllegalStateException.class, () -> open(file));
+  void committedCrudAndCategoryRelationship() {
+    var saved = service.save(null, item("Leg press", "Musculação", null));
+    assertTrue(saved.active());
+    assertEquals(saved, service.get(saved.id()));
+    assertEquals("Musculação", jdbc.queryForObject(
+        "SELECT c.name FROM equipment e JOIN category c ON c.id = e.category_id WHERE e.id = ?",
+        String.class, saved.id()));
+    service.save(saved.id(), item("Atualizado", "Cardio", false));
+    assertFalse(service.get(saved.id()).active());
+    service.save(saved.id(), item("Angular omite active", "Cardio", null));
+    assertFalse(service.get(saved.id()).active());
+    assertEquals("Cardio", service.get(saved.id()).category());
+    service.delete(saved.id());
+    assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM equipment", Long.class));
+    assertTrue(service.save(null, item("Novo", "Cardio", null)).id() > saved.id());
   }
 
   @Test
-  void failedWriteDoesNotChangeMemoryOrExistingFile() throws Exception {
-    Path folder = directory.resolve("data");
-    Files.createDirectory(folder);
-    var repository = open(folder.resolve("equipment.json"));
-    Equipment saved = repository.save(item(null, "Original"));
-    Path backup = directory.resolve("backup");
-    Files.move(folder, backup);
-    Files.writeString(folder, "block parent directory");
-    assertThrows(UncheckedIOException.class, () -> repository.save(item(saved.id(), "Alterado")));
-    assertEquals(saved, repository.findById(saved.id()).orElseThrow());
-    assertEquals(saved, open(backup.resolve("equipment.json")).findById(saved.id()).orElseThrow());
-  }
-
-  @Test
-  void concurrentCreatesKeepEveryItemWithUniqueIds() throws Exception {
-    Path file = directory.resolve("equipment.json");
-    var repository = open(file);
+  void concurrentCreatesShareOneCategoryAndHaveUniqueIds() throws Exception {
     try (var executor = Executors.newFixedThreadPool(4)) {
-      var futures =
-          IntStream.range(0, 20)
-              .mapToObj(n -> executor.submit(() -> repository.save(item(null, "Item " + n))))
-              .toList();
+      var futures = IntStream.range(0, 20)
+          .mapToObj(n -> executor.submit(() -> service.save(null, item("Item " + n, "Musculação", null))))
+          .toList();
       for (var future : futures) future.get();
     }
-    var reloaded = open(file).findAll();
-    assertEquals(20, reloaded.size());
-    assertEquals(20L, reloaded.stream().map(Equipment::id).distinct().count());
+    assertEquals(20, service.list().size());
+    assertEquals(20, service.list().stream().map(EquipmentDto::id).distinct().count());
+    assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM category", Long.class));
   }
 }

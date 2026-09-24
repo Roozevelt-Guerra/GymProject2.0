@@ -1,14 +1,16 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
-COPY pom.xml .
-RUN mvn -B dependency:go-offline
+RUN useradd --create-home builder && chown builder:builder /build
+USER builder
+COPY --chown=builder:builder pom.xml .
+RUN mvn -B -Dmaven.repo.local=/home/builder/.m2/repository dependency:go-offline
 
-COPY src ./src
-RUN mvn -B package
+COPY --chown=builder:builder src ./src
+RUN mvn -B -Dmaven.repo.local=/home/builder/.m2/repository package
 
 FROM eclipse-temurin:21-jre-jammy
-WORKDIR / app
+WORKDIR /app
 
 RUN groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home app \

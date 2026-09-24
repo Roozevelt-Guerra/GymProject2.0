@@ -12,4 +12,5 @@ public record EquipmentDto(
         @Size(max = 2048)
         @Pattern(regexp = "https://[^\\s]+", message = "Informe uma URL HTTPS válida")
         String imageUrl,
-    @NotBlank @Size(max = 60) String category) {}
+    @NotBlank @Size(max = 60) String category,
+    Boolean active) {}

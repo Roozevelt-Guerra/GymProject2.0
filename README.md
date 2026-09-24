@@ -1,10 +1,10 @@
 # MAQPRO — catálogo de equipamentos
 
-Aplicação Angular + Spring Boot com armazenamento em arquivo JSON local com identidade vermelha e preta baseada na arte fornecida. O código já está criado neste diretório; não é necessário copiar trechos ou criar arquivos manualmente.
+Aplicação Angular + Spring Boot com persistência em PostgreSQL via Spring Data JPA com identidade vermelha e preta baseada na arte fornecida. O código já está criado neste diretório; não é necessário copiar trechos ou criar arquivos manualmente.
 
 ## Executar localmente
 
-Requisitos: Java 21, Maven 3.9+ e Node.js 24. Não é necessário instalar banco de dados.
+Requisitos: Java 21, Maven 3.9+ e Node.js 24. É necessário PostgreSQL acessível ao backend (local ou no Render).
 
 Na raiz do projeto (se já existir `.env`, edite-o em vez de sobrescrevê-lo):
 
@@ -12,9 +12,25 @@ Na raiz do projeto (se já existir `.env`, edite-o em vez de sobrescrevê-lo):
 cp .env.example .env
 ```
 
-Edite `.env`: defina `ADMIN_PASSWORD` com pelo menos 12 caracteres e `WHATSAPP_NUMBER` com país, DDD e telefone, apenas dígitos. O usuário administrativo padrão é `admin`, alterável por `ADMIN_USERNAME`. A senha administrativa precisa ter pelo menos 12 caracteres para o backend iniciar. `CATALOG_FILE` define onde salvar o catálogo; o padrão é `data/equipment.json`, relativo à pasta de execução do backend. Se um valor contiver espaços ou caracteres especiais do shell, coloque-o entre aspas simples.
+Edite `.env`: defina `ADMIN_PASSWORD` com pelo menos 12 caracteres e `WHATSAPP_NUMBER` com país, DDD e telefone, apenas dígitos. O usuário administrativo padrão é `admin`, alterável por `ADMIN_USERNAME`. A senha administrativa precisa ter pelo menos 12 caracteres para o backend iniciar. `DATABASE_URL` deve usar o formato JDBC (`jdbc:postgresql://localhost:5432/maqpro`), sem credenciais na URL; preencha `DATABASE_USERNAME` e `DATABASE_PASSWORD`. Crie previamente o banco `maqpro` e um usuário com permissão de criar tabelas e sequências nesse banco. `CATALOG_FILE` aponta para o JSON legado a importar; o padrão é `data/equipment.json`, relativo à pasta de execução do backend. Com `CATALOG_IMPORT_ENABLED=true` (padrão), esse arquivo é obrigatório até a primeira importação concluída. Para uma instalação nova sem JSON, defina `CATALOG_IMPORT_ENABLED=false`. Se um valor contiver espaços ou caracteres especiais do shell, coloque-o entre aspas simples.
 
-O Spring Boot não carrega `.env` automaticamente. No Bash, carregue as variáveis antes de iniciar o backend, partindo da raiz do projeto:
+O Spring Boot não carrega `.env` automaticamente. Os comandos abaixo carregam as variáveis no Bash a partir da raiz do projeto.
+
+Se ainda não possui PostgreSQL local, uma opção é Docker. Preencha primeiro `DATABASE_USERNAME` e `DATABASE_PASSWORD` no `.env`, mantenha a URL local indicada acima e execute na raiz:
+
+```bash
+set -a
+source .env
+set +a
+docker run -d --name maqpro-postgres \
+  -e POSTGRES_DB=maqpro \
+  -e POSTGRES_USER="$DATABASE_USERNAME" \
+  -e POSTGRES_PASSWORD="$DATABASE_PASSWORD" \
+  -p 127.0.0.1:5432:5432 \
+  -v maqpro-postgres-data:/var/lib/postgresql/data postgres:17
+```
+
+O volume mantém os dados. Nas execuções seguintes use `docker start maqpro-postgres`. As credenciais acima inicializam apenas volumes novos. Para executar o backend:
 
 ```bash
 set -a
@@ -38,9 +54,9 @@ npm start
 - Login: usuário e senha configurados no `.env`.
 - Encerrar: pressione `Ctrl+C` em cada terminal.
 
-O proxy do Angular encaminha `/api` para o backend, mantendo a sessão na mesma origem. Os dados permanecem no arquivo JSON após encerrar as aplicações. Sem telefone configurado, o aplicativo informa isso ao solicitar orçamento.
+O proxy do Angular encaminha `/api` para o backend, mantendo a sessão na mesma origem. Os dados permanecem no PostgreSQL após encerrar as aplicações. Sem telefone configurado, o aplicativo informa isso ao solicitar orçamento.
 
-O catálogo começa vazio: entre na administração e cadastre seus equipamentos reais. Imagens são cadastradas por URL HTTPS pública; este projeto não inclui upload de arquivos. A arte fornecida fica em `frontend/public/assets/maqpro.png`.
+Na primeira execução, o catálogo existente é importado do JSON. Sem importação, entre na administração e cadastre seus equipamentos reais. Imagens são cadastradas por URL HTTPS pública; este projeto não inclui upload de arquivos. A arte fornecida fica em `frontend/public/assets/maqpro.png`.
 
 ## Organização dos arquivos
 
@@ -52,15 +68,16 @@ O catálogo começa vazio: entre na administração e cadastre seus equipamentos
 │   └── src/
 │       ├── main/java/br/com/maqpro/
 │       │   ├── MaqproApplication.java
-│       │   ├── config/SecurityConfig.java
+│       │   ├── config/           # Segurança e importação na inicialização
 │       │   ├── controller/       # Endpoints de catálogo, sessão e configuração
-│       │   ├── service/EquipmentService.java
-│       │   ├── repository/EquipmentRepository.java
-│       │   ├── entity/Equipment.java
+│       │   ├── service/          # EquipmentService e CatalogImporter
+│       │   ├── repository/       # EquipmentRepository e CategoryRepository
+│       │   ├── entity/           # Equipment e Category
 │       │   └── dto/EquipmentDto.java
 │       ├── main/resources/
-│       │   └── application.yml
-│       └── test/java/br/com/maqpro/CatalogIntegrationTest.java
+│       │   ├── application.yml
+│       │   └── db/migration/V1__create_catalog.sql
+│       └── test/java/br/com/maqpro/ # API, persistência e importação com PostgreSQL
 └── frontend/
     ├── package.json              # Dependências e comandos npm
     ├── angular.json              # Configuração do Angular
@@ -86,7 +103,7 @@ O catálogo começa vazio: entre na administração e cadastre seus equipamentos
                 └── admin.page.*
 ```
 
-Cada página/componente possui um arquivo TypeScript e um template HTML. Controller recebe e valida requisições; Service implementa operações; Repository lê e grava o arquivo JSON; Entity representa um equipamento imutável; DTO define os dados expostos pela API.
+Cada página/componente possui um arquivo TypeScript e um template HTML. Controller recebe e valida requisições; Service implementa operações; Repository usa Spring Data JPA; Equipment e Category são entidades relacionadas por `ManyToOne`; DTO mantém os campos consumidos pelo Angular. O Flyway cria e versiona o esquema e o Hibernate apenas o valida (`ddl-auto=validate`).
 
 ## Funcionalidades
 
@@ -98,13 +115,13 @@ Cada página/componente possui um arquivo TypeScript e um template HTML. Control
 - Login e logout por sessão, cookie HttpOnly, proteção CSRF, rotas de escrita restritas a administrador e senha codificada com BCrypt.
 - CRUD administrativo com validação no servidor, confirmação de exclusão e mensagens de erro.
 
-O administrador único é configurado por variáveis de ambiente e carregado em memória com senha codificada. Os equipamentos são persistidos no arquivo JSON configurado. Não há cadastro de usuários, pagamento, controle de estoque ou armazenamento de pedidos; o carrinho serve para solicitar um orçamento, e os valores não incluem frete.
+O administrador único é configurado por variáveis de ambiente e carregado em memória com senha codificada. Os equipamentos e suas categorias são persistidos no PostgreSQL. Não há cadastro de usuários, pagamento, controle de estoque ou armazenamento de pedidos; o carrinho serve para solicitar um orçamento, e os valores não incluem frete.
 
 ## Executar pelo IntelliJ
 
 Importe `backend/pom.xml` como projeto Maven e selecione um SDK Java 21. Crie uma configuração de execução para `br.com.maqpro.MaqproApplication` e preencha suas variáveis de ambiente com os valores de `.env.example`, usando suas credenciais reais. Execute o frontend pelo terminal com `npm start` dentro de `frontend`.
 
-O arquivo `.env` serve para a execução via Bash descrita acima; ao iniciar pelo IntelliJ, configure as variáveis na própria configuração de execução. Use `backend` como diretório de trabalho ou defina `CATALOG_FILE` com um caminho absoluto para acessar o mesmo catálogo em ambos os modos.
+O arquivo `.env` serve para a execução via Bash descrita acima; ao iniciar pelo IntelliJ, configure as variáveis na própria configuração de execução. Use `backend` como diretório de trabalho ou defina `CATALOG_FILE` com um caminho absoluto para importar o mesmo JSON em ambos os modos. A conexão com o banco também deve ser configurada nas variáveis da execução.
 
 ## API
 
@@ -140,7 +157,7 @@ cd backend
 mvn verify
 ```
 
-Os testes usam arquivos temporários isolados e verificam CRUD, validação, autorização, CSRF, login e logout. Os testes de armazenamento verificam persistência após reabrir o arquivo, IDs únicos, gravações concorrentes e preservação dos dados em caso de erro.
+Os testes iniciam PostgreSQL real temporário com `embedded-postgres`, sem Docker e sem acessar seu banco ou `.env`. Execute como usuário comum (o PostgreSQL não inicia como root). A primeira execução baixa os binários via Maven. São verificados CRUD, categorias, concorrência, validação, autorização, CSRF, login/logout, importação única, rollback e preservação do JSON. O Dockerfile também executa os testes com usuário comum durante o build.
 
 ```bash
 cd frontend
@@ -149,7 +166,7 @@ npm run build
 npx playwright install chromium
 ```
 
-Com as aplicações em execução e o WhatsApp configurado, inicie o backend com `CATALOG_FILE` apontando para um arquivo separado de testes e rode:
+Com as aplicações em execução e o WhatsApp configurado, use um **banco separado de testes**, `CATALOG_IMPORT_ENABLED=false` e as credenciais administrativas de teste; então rode:
 
 ```bash
 E2E_ADMIN_PASSWORD='sua-senha-administrativa-forte' npm run test:e2e
@@ -170,16 +187,67 @@ docker run --rm --name maqpro-backend -p 8080:8080 \
   maqpro-backend
 ```
 
-Ao usar `--env-file`, escreva os valores no formato `CHAVE=valor`, sem aspas externas e sem `export`. A imagem usa Java 21, executa os testes durante o build e inicia com usuário sem privilégios de root. O volume `maqpro-data` preserva o catálogo entre execuções; começa vazio e não importa `backend/data`. A API fica disponível em http://localhost:8080/api/equipment.
+Ao usar `--env-file`, escreva os valores no formato `CHAVE=valor`, sem aspas externas e sem `export`. A imagem usa Java 21, executa os testes durante o build e inicia com usuário sem privilégios de root. O banco precisa estar acessível pela URL configurada (dentro do contêiner, `localhost` aponta para o próprio contêiner). O volume só fornece o JSON legado: coloque nele o arquivo antes da primeira inicialização, ou desative a importação se o banco for novo. A imagem não inclui `backend/data` nem `.env`. A API fica disponível em http://localhost:8080/api/equipment.
 
 Gere o backend com `mvn package` dentro de `backend` e execute `java -jar target/maqpro-api-1.0.0.jar` com as variáveis de ambiente configuradas. Gere o frontend com `npm run build` dentro de `frontend` e sirva `frontend/dist/maqpro/browser` em um servidor web com fallback das rotas para `index.html` e encaminhamento de `/api` para a API.
 
-Use HTTPS e defina `COOKIE_SECURE=true` nesse ambiente. Faça backup do arquivo configurado em `CATALOG_FILE` e use URLs estáveis para as fotografias.
+Use HTTPS e defina `COOKIE_SECURE=true` nesse ambiente. Mantenha backups do PostgreSQL e do JSON original da migração e use URLs estáveis para as fotografias.
 
-## Armazenamento sem banco de dados
+## Migração segura do catálogo existente
 
-Ao executar a partir de `backend`, o arquivo padrão é `backend/data/equipment.json`. A pasta e o arquivo são criados no primeiro cadastro. Não crie um arquivo vazio manualmente. Se desejar outro local, configure `CATALOG_FILE` com um caminho absoluto.
+1. Antes de substituir o backend antigo, suspenda cadastros/edições/exclusões e faça uma cópia do `equipment.json` **mais recente**. Se os dados foram alterados no Render, use o arquivo do Render, não uma cópia local desatualizada. Não apague nem sobrescreva o original.
+2. Crie um banco PostgreSQL vazio. Configure as três variáveis `DATABASE_*` e `CATALOG_FILE` apontando para a cópia. Mantenha `CATALOG_IMPORT_ENABLED=true`.
+3. Inicie o backend novo. O Flyway cria `category`, `equipment`, `catalog_import` e seu histórico. A importação valida todo o arquivo, preserva IDs/preços/URLs, compartilha categorias de mesmo nome (após remover espaços nas extremidades) e respeita `nextId`, inclusive IDs anteriormente excluídos. Itens legados recebem `active=true`.
+4. Confira o log `Importação do catálogo concluída: N equipamentos` e as consultas abaixo. Só depois libere as alterações administrativas no backend novo.
 
-O catálogo é carregado ao iniciar. Cada alteração grava um arquivo temporário na mesma pasta e substitui o JSON de forma atômica; uma falha de gravação não altera o catálogo em memória. IDs não são reutilizados após exclusões. Se o JSON estiver inválido, o backend interrompe a inicialização e preserva o arquivo para recuperação.
+A importação inteira e o registro de conclusão são transacionais. Um bloqueio no PostgreSQL impede importações duplicadas por instâncias simultâneas. JSON inválido/ausente, erro de banco ou banco já preenchido sem registro de importação interrompem a inicialização; corrija a causa e tente novamente. O arquivo nunca é alterado. Lacunas em sequências após rollback são normais e não perdem dados.
 
-Use uma única instância do backend por arquivo. Não edite o JSON enquanto o backend estiver executando. Esse armazenamento é adequado para o catálogo local; não permite compartilhar o arquivo entre vários servidores. Não há importação automática de dados de uma instalação anterior que usava banco de dados.
+Depois de concluída, a importação é ignorada mesmo que o JSON mude, seja removido ou todos os equipamentos sejam excluídos. **Não apague o registro em `catalog_import` para forçar reimportação.** `CATALOG_IMPORT_ENABLED=false` desativa a leitura do JSON; não transforma um banco ocupado em candidato à importação.
+
+O campo opcional `active` foi acrescentado ao DTO. Cadastros sem ele ficam ativos; edições sem ele preservam o valor. Para preservar o comportamento atual, os endpoints continuam listando todos os equipamentos e DELETE continua excluindo fisicamente. Não foi acrescentado filtro de ativos nem controle visual no Angular.
+
+## PostgreSQL no Render
+
+No painel Render, use **New → Postgres**, escolha nome, banco/usuário e uma região igual à do backend. Aguarde ficar disponível. Use host, porta, database, username e password exibidos em **Connect/Info**. Consulte a [documentação oficial de criação e conexão](https://render.com/docs/postgresql-creating-connecting).
+
+Em **backend → Environment**, configure:
+
+| Variável | Valor |
+| --- | --- |
+| `DATABASE_URL` | `jdbc:postgresql://HOST_INTERNO:5432/NOME_DO_BANCO` |
+| `DATABASE_USERNAME` | Usuário exibido pelo Render |
+| `DATABASE_PASSWORD` | Senha exibida pelo Render, como segredo |
+| `ADMIN_USERNAME` | Mantenha o usuário atual |
+| `ADMIN_PASSWORD` | Mantenha a senha atual (mínimo 12 caracteres) |
+| `WHATSAPP_NUMBER` | Mantenha o número atual |
+| `COOKIE_SECURE` | `true` para HTTPS |
+| `CATALOG_IMPORT_ENABLED` | `true` na migração; pode ser `false` após conferência |
+| `CATALOG_FILE` | Caminho do JSON no processo que fará a importação |
+
+**A URL deve ser JDBC.** Não cole diretamente `postgresql://usuario:senha@host/banco`: monte `jdbc:postgresql://host:porta/banco` e informe usuário/senha nas variáveis separadas. Para conexões externas use o host externo e acrescente `?sslmode=require`. Entre backend e banco no Render, use a conexão interna na mesma região, conforme a documentação oficial.
+
+Como alternativa a enviar o JSON ao contêiner Render, execute **uma vez localmente** o JAR novo com a conexão externa do banco Render, `CATALOG_FILE` absoluto e importação habilitada. Pare essa execução após conferir os dados. Depois publique o backend usando a conexão interna para **o mesmo banco**: ele encontrará o registro da importação e não precisará do JSON. Suspenda gravações no backend antigo durante todo esse procedimento. Não coloque o JSON nem credenciais no Git/imagem Docker.
+
+O frontend Vercel e seu encaminhamento atual de `/api` continuam iguais. Carrinho continua no navegador e orçamentos do WhatsApp não são gravados.
+
+## Conferir a persistência no PostgreSQL
+
+Conecte pelo comando PSQL fornecido pelo Render ou, localmente, com `psql -h localhost -U SEU_USUARIO -d maqpro -W`. Use o cliente do banco para executar:
+
+```sql
+SELECT e.id, e.name, e.price, e.image_url, c.name AS category, e.active
+FROM equipment e JOIN category c ON c.id = e.category_id
+ORDER BY e.id;
+
+SELECT * FROM catalog_import;
+SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;
+```
+
+Cadastre um equipamento na administração e confira a linha no SQL. Edite preço/categoria, consulte novamente, reinicie o backend e confirme que a API retorna os mesmos dados (`http://localhost:8080/api/equipment`). Exclua o item e confirme a ausência via SQL. Reinicie novamente: o JSON antigo não deve restaurar o equipamento excluído. Compare `imported_count` com a quantidade do JSON no momento da migração; esse contador histórico não muda com novos cadastros.
+
+## Dependências adicionadas
+
+- `spring-boot-starter-data-jpa`: entidades, repositórios e transações.
+- `postgresql` (runtime): driver JDBC.
+- `flyway-core` e `flyway-database-postgresql` (este em runtime): esquema SQL versionado, conforme a [integração do Spring Boot](https://docs.spring.io/spring-boot/how-to/data-initialization.html).
+- `io.zonky.test:embedded-postgres:2.2.2` (test): PostgreSQL temporário real, conforme o [projeto oficial](https://github.com/zonkyio/embedded-postgres).

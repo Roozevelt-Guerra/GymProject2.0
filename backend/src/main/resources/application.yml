@@ -1,3 +1,14 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
 server:
   servlet:
     session:
@@ -7,6 +18,7 @@ server:
         same-site: lax
         secure: ${COOKIE_SECURE:false}
 app:
+  catalog-import-enabled: ${CATALOG_IMPORT_ENABLED:true}
   catalog-file: ${CATALOG_FILE:data/equipment.json}
   admin-username: ${ADMIN_USERNAME:admin}
   admin-password: ${ADMIN_PASSWORD}
