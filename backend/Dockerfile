@@ -8,7 +8,7 @@ COPY src ./src
 RUN mvn -B package
 
 FROM eclipse-temurin:21-jre-jammy
-WORKDIR /app
+WORKDIR / app
 
 RUN groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home app \
